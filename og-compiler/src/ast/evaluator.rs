@@ -1,4 +1,5 @@
 use crate::ast::{ASTBinaryExpression, ASTBinaryOperatorKind, ASTNumberExpression, ASTVisitor};
+use crate::ast::lexer::TextSpan;
 
 pub struct ASTEvaluator {
     pub last_value: Option<i64>,
@@ -13,6 +14,10 @@ impl ASTEvaluator {
 impl ASTVisitor for ASTEvaluator {
     fn visit_number(&mut self, number: &ASTNumberExpression) {
         self.last_value = Some(number.number);
+    }
+
+    fn visit_error(&mut self, span: &TextSpan) {
+        println!("haha")
     }
 
     fn visit_binary_expression(&mut self, expr: &ASTBinaryExpression) {

@@ -1,4 +1,4 @@
-use crate::ast::lexer::{Token};
+use crate::ast::lexer::{TextSpan, Token};
 
 pub mod lexer;
 pub mod parser;
@@ -54,6 +54,10 @@ impl ASTVisitor for ASTPrinter {
         self.print_with_indent(&format!("Number: {}", number.number));
     }
 
+    fn visit_error(&mut self, span: &TextSpan) {
+        self.print_with_indent(&format!("Error: {:?}", span))
+    }
+
     fn visit_binary_expression(&mut self, binary_expression: &ASTBinaryExpression) {
         self.print_with_indent("Binary Expression:");
         self.indent += LEVEL_INDENT;
@@ -99,14 +103,18 @@ pub trait ASTVisitor {
             ASTExpressionKind::Parenthesized(expr) => {
                 self.visit_parenthesized_expression(expr)
             }
+            ASTExpressionKind::Error(span) => {
+                self.visit_error(span);
+            }
         }
     }
     fn visit_expression(&mut self, expression: &ASTExpression) {
         self.do_visit_expression(expression)
     }
     fn visit_number(&mut self, number: &ASTNumberExpression);
+    fn visit_error(&mut self, number: &TextSpan);
 
-    fn visit_binary_expression(&mut self, binary_expression: &ASTBinaryExpression) {
+    fn  visit_binary_expression(&mut self, binary_expression: &ASTBinaryExpression) {
         self.visit_expression(&binary_expression.left);
         self.visit_expression(&binary_expression.right);
     }
@@ -143,6 +151,9 @@ pub enum ASTExpressionKind {
     ),
     Parenthesized(
         ASTParenthesizedExpression
+    ),
+    Error(
+        TextSpan
     ),
 }
 
@@ -207,7 +218,11 @@ impl ASTExpression {
         ASTExpression::new(ASTExpressionKind::Binary(ASTBinaryExpression { left: Box::new(left), operator, right: Box::new(right) }))
     }
 
-    pub fn parenthesized(expression: ASTExpression) -> Self{
+    pub fn parenthesized(expression: ASTExpression) -> Self {
         ASTExpression::new(ASTExpressionKind::Parenthesized(ASTParenthesizedExpression { expression: Box::new(expression) }))
+    }
+
+    pub fn error(span: TextSpan) -> Self {
+        ASTExpression::new(ASTExpressionKind::Error(span))
     }
 }
