@@ -8,15 +8,27 @@ pub struct Token {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum TokenKind {
+    // Literals
     Number(i64),
+    // Operators
     Plus,
     Minus,
     Asterisk,
     Slash,
+    Equals,
+    Ampersand,
+    Pipe,
+    Caret,
+    DoubleAsterisk,
+    Tilde,
+    // Keywords
+    Let,
+    // Other
     LeftParen,
     RightParen,
     Bad,
     Whitespace,
+    Identifier,
     Eof,
 }
 
@@ -33,6 +45,14 @@ impl Display for TokenKind {
             TokenKind::Bad => write!(f, "Bad"),
             TokenKind::Whitespace => write!(f, "Whitespace"),
             TokenKind::Eof => write!(f, "Eof"),
+            TokenKind::Identifier => write!(f, "Identifier"),
+            TokenKind::Equals => write!(f, "Equals"),
+            TokenKind::Let => write!(f, "Let"),
+            TokenKind::Ampersand => write!(f, "&"),
+            TokenKind::Pipe => write!(f, "|"),
+            TokenKind::Caret => write!(f, "^"),
+            TokenKind::DoubleAsterisk => write!(f, "**"),
+            TokenKind::Tilde => write!(f, "~"),
         }
     }
 }
@@ -56,7 +76,7 @@ impl TextSpan {
 
 impl Token {
     pub fn new(kind: TokenKind, span: TextSpan) -> Self {
-        Self {kind, span}
+        Self { kind, span }
     }
 }
 
@@ -89,6 +109,12 @@ impl<'a> Lexer<'a> {
             } else if Self::is_whitespace(&c) {
                 self.consume();
                 kind = TokenKind::Whitespace;
+            } else if Self::is_identifier_start(&c) {
+                let identifier = self.consume_identifier();
+                kind = match identifier.as_str() {
+                    "let" => TokenKind::Let,
+                    _ => TokenKind::Identifier
+                }
             } else {
                 kind = self.consume_punctuation();
             }
@@ -98,8 +124,11 @@ impl<'a> Lexer<'a> {
             let span = TextSpan::new(start, end, literal);
 
             Token::new(kind, span)
-        })
+        });
+    }
 
+    fn is_identifier_start(c: &char) -> bool {
+        c.is_alphabetic()
     }
 
     fn is_number_start(c: &char) -> bool {
@@ -138,10 +167,26 @@ impl<'a> Lexer<'a> {
         match c {
             '+' => TokenKind::Plus,
             '-' => TokenKind::Minus,
-            '*' => TokenKind::Asterisk,
+            '*' => {
+                if let Some(next) = self.current_char() {
+                    if next == '*' {
+                        self.consume();
+                        TokenKind::DoubleAsterisk
+                    } else {
+                        TokenKind::Asterisk
+                    }
+                } else {
+                    TokenKind::Asterisk
+                }
+            },
             '/' => TokenKind::Slash,
             '(' => TokenKind::LeftParen,
             ')' => TokenKind::RightParen,
+            '=' => TokenKind::Equals,
+            '&' => TokenKind::Ampersand,
+            '^' => TokenKind::Caret,
+            '|' => TokenKind::Pipe,
+            '~' => TokenKind::Tilde,
             _ => TokenKind::Bad,
         }
     }
@@ -152,5 +197,18 @@ impl<'a> Lexer<'a> {
 
     fn consume_whitespace(&self) {
         todo!()
+    }
+
+    fn consume_identifier(&mut self) -> String {
+        let mut identifier = String::new();
+        while let Some(c) = self.current_char() {
+            if Self::is_identifier_start(&c) {
+                self.consume().unwrap();
+                identifier.push(c);
+            } else {
+                break;
+            }
+        }
+        identifier
     }
 }

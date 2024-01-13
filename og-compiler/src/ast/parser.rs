@@ -1,5 +1,6 @@
 use std::cell::Cell;
-use crate::ast::{ASTBinaryOperator, ASTBinaryOperatorKind, ASTExpression, ASTExpressionKind, ASTStatement};
+
+use crate::ast::{ASTBinaryOperator, ASTBinaryOperatorKind, ASTExpression, ASTStatement, ASTUnaryExpression, ASTUnaryOperator, ASTUnaryOperatorKind};
 use crate::ast::lexer::{Token, TokenKind};
 use crate::diagnostics::DiagnosticsBagCell;
 
@@ -9,7 +10,9 @@ pub struct Counter {
 
 impl Counter {
     pub fn new() -> Self {
-        Self { value: Cell::new(0) }
+        Self {
+            value: Cell::new(0)
+        }
     }
 
     pub fn increment(&self) {
@@ -29,15 +32,14 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn new(tokens: Vec<Token>,
-               diagnostics_bag: DiagnosticsBagCell) -> Self {
-        let tokens_vec = tokens
-            .iter()
-            .filter(|token| token.kind != TokenKind::Whitespace)
-            .map(|token| token.clone())
-            .collect();
+    pub fn new(
+        tokens: Vec<Token>,
+        diagnostics_bag: DiagnosticsBagCell,
+    ) -> Self {
         Self {
-            tokens: tokens_vec,
+            tokens: tokens.iter().filter(
+                |token| token.kind != TokenKind::Whitespace
+            ).map(|token| token.clone()).collect(),
             current: Counter::new(),
             diagnostics_bag,
         }
@@ -55,6 +57,25 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> ASTStatement {
+        match self.current().kind {
+            TokenKind::Let => {
+                self.parse_let_statement()
+            }
+            _ => {
+                self.parse_expression_statement()
+            }
+        }
+    }
+
+    fn parse_let_statement(&mut self) -> ASTStatement {
+        self.consume_and_check(TokenKind::Let);
+        let identifier = self.consume_and_check(TokenKind::Identifier).clone();
+        self.consume_and_check(TokenKind::Equals);
+        let expr = self.parse_expression();
+        return ASTStatement::let_statement(identifier, expr);
+    }
+
+    fn parse_expression_statement(&mut self) -> ASTStatement {
         let expr = self.parse_expression();
         return ASTStatement::expression(expr);
     }
@@ -64,19 +85,43 @@ impl Parser {
     }
 
     fn parse_binary_expression(&mut self, precedence: u8) -> ASTExpression {
-        let mut left = self.parse_primary_expression();
+        let mut left = self.parse_unary_expression();
 
         while let Some(operator) = self.parse_binary_operator() {
-            self.consume();
             let operator_precedence = operator.precedence();
             if operator_precedence < precedence {
                 break;
             }
+            self.consume();
             let right = self.parse_binary_expression(operator_precedence);
             left = ASTExpression::binary(operator, left, right);
         }
 
         return left;
+    }
+    fn parse_unary_expression(&mut self) -> ASTExpression {
+        if let Some(operator) = self.parse_unary_operator() {
+            self.consume();
+            let operand = self.parse_unary_expression();
+            return ASTExpression::unary(operator, operand);
+        }
+        return self.parse_primary_expression();
+    }
+
+    fn parse_unary_operator(&mut self) -> Option<ASTUnaryOperator> {
+        let token = self.current();
+        let kind = match token.kind {
+            TokenKind::Minus => {
+                Some(ASTUnaryOperatorKind::Minus)
+            },
+            TokenKind::Tilde => {
+              Some(ASTUnaryOperatorKind::BitwiseNot)
+            },
+            _ => {
+                None
+            }
+        };
+        return kind.map(|kind| ASTUnaryOperator::new(kind, token.clone()));
     }
 
     fn parse_binary_operator(&mut self) -> Option<ASTBinaryOperator> {
@@ -94,13 +139,24 @@ impl Parser {
             TokenKind::Slash => {
                 Some(ASTBinaryOperatorKind::Divide)
             }
+            TokenKind::Ampersand => {
+                Some(ASTBinaryOperatorKind::BitwiseAnd)
+            }
+            TokenKind::Pipe => {
+                Some(ASTBinaryOperatorKind::BitwiseOr)
+            }
+            TokenKind::Caret => {
+                Some(ASTBinaryOperatorKind::BitwiseXor)
+            }
+            TokenKind::DoubleAsterisk => {
+                Some(ASTBinaryOperatorKind::Power)
+            }
             _ => {
                 None
             }
         };
         return kind.map(|kind| ASTBinaryOperator::new(kind, token.clone()));
     }
-
 
     fn parse_primary_expression(&mut self) -> ASTExpression {
         let token = self.consume();
@@ -110,8 +166,13 @@ impl Parser {
             }
             TokenKind::LeftParen => {
                 let expr = self.parse_expression();
-                let token = self.consume_and_check(TokenKind::RightParen);
-                ASTExpression::parenthesized(expr)
+                self.consume_and_check(TokenKind::RightParen);
+                ASTExpression::parenthesized(
+                    expr
+                )
+            }
+            TokenKind::Identifier => {
+                ASTExpression::identifier(token.clone())
             }
             _ => {
                 self.diagnostics_bag.borrow_mut().report_expected_expression(token);
@@ -139,7 +200,7 @@ impl Parser {
         self.peek(-1)
     }
 
-    fn consume_and_check(&mut self, kind: TokenKind) -> &Token {
+    fn consume_and_check(&self, kind: TokenKind) -> &Token {
         let token = self.consume();
         if token.kind != kind {
             self.diagnostics_bag.borrow_mut().report_unexpected_token(
