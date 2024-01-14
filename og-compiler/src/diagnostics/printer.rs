@@ -10,7 +10,7 @@ pub struct DiagnosticsPrinter<'a> {
 
 const PREFIX_LENGTH: usize = 8;
 
-impl<'a> DiagnosticsPrinter<'a> {
+impl <'a> DiagnosticsPrinter<'a> {
     pub fn new(text: &'a SourceText, diagnostics: &'a [Diagnostic]) -> Self {
         Self {
             text,
@@ -18,10 +18,15 @@ impl<'a> DiagnosticsPrinter<'a> {
         }
     }
 
-    /// let <red>x<reset> = 5
+    /// Stringifies the diagnostic.
+    ///
+    /// It uses the following format:
+    ///
+    /// let <red>x<reset> = 5;
     ///          ^
     ///          |
-    ///          L__ This is the error message (<line>:<column>)
+    ///          +-- This is the error message (<line>:<column>)
+    ///
     pub fn stringify_diagnostic(&self, diagnostic: &Diagnostic) -> String {
         let line_index = self.text.line_index(diagnostic.span.start);
         let line = self.text.get_line(line_index);
@@ -38,12 +43,15 @@ impl<'a> DiagnosticsPrinter<'a> {
     }
 
     fn format_error_message(diagnostic: &Diagnostic, indent: usize, column: usize, line_index: usize) -> String {
-        let error_message = format!("{:indent$}+-- {} ({}:{})", "", diagnostic.message, column + 1, line_index + 1, indent = indent);
-        error_message
+        format!("{:indent$}+-- {} ({}:{})", "", diagnostic.message, column + 1, line_index + 1, indent = indent)
     }
 
     fn format_arrow(diagnostic: &Diagnostic, indent: usize) -> (String, String) {
-        let arrow_pointers = format!("{:indent$}{}", "", std::iter::repeat('^').take(diagnostic.span.length()).collect::<String>(), indent = indent);
+        let arrow_pointers = format!("{:indent$}{}", "", std::iter::repeat(
+            '^'
+        ).take(
+            diagnostic.span.length()
+        ).collect::<String>(), indent = indent);
         let arrow_line = format!("{:indent$}|", "", indent = indent);
         (arrow_pointers, arrow_line)
     }
@@ -66,4 +74,3 @@ impl<'a> DiagnosticsPrinter<'a> {
         }
     }
 }
-

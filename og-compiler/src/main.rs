@@ -1,4 +1,8 @@
+
 use crate::compilation_unit::CompilationUnit;
+
+
+
 
 mod ast;
 mod diagnostics;
@@ -6,12 +10,37 @@ mod text;
 mod compilation_unit;
 
 
-fn main() {
+fn main() -> Result<(),()>{
     let input = "\
-        let a = 3
-        let b = (1 + 2) * --a + 3 + 5 ** 2\
+        let a = 10
+        func doSomething {
+            a = 20
+        }
+        func main {
+        }
+        let a = add(1, 2)
+        func add(a, b) {
+            return a + b
+        }
+        while a < 10 {
+            a = a + 1
+        }
+        if a >= 10 {
+            a = 25
+        }
+        else
+        {
+            a = 20
+            let a = 10
+            a = 15
+        }
+        let b = 10
+        if true {
+            b = 20
+        }
+        let c = a + b
     ";
-
-    let compilation_unit = CompilationUnit::compile(input);
-    compilation_unit.maybe_run();
+    let compilation_unit = CompilationUnit::compile(input).map_err(|_|())?;
+    compilation_unit.run();
+    Ok(())
 }
